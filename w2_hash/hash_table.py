@@ -45,10 +45,10 @@ class Item:
 class HashTable:
 
     # Initialize the hash table.
-    def __init__(self):
+    def __init__(self, n = 97):
         # Set the initial bucket size to 97. A prime number is chosen to reduce
         # hash conflicts.
-        self.bucket_size = 97
+        self.bucket_size = n
         self.buckets = [None] * self.bucket_size
         self.item_count = 0
 
