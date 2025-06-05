@@ -61,11 +61,9 @@ class HashTable:
     #               and the value is updated.
     def put(self, key, value):
         assert type(key) == str
-        self.check_size() # Note: Don't remove this code.
-        #------------------------#
-        if self.check_size_rehash_double:
-            self.rehash_double
-        #------------------------#
+        # self.check_size() # Note: Don't remove this code. ## REMOVE this code for rehash.
+        if self.check_size_rehash_double():
+            self.rehash_double()
         bucket_index = calculate_hash(key) % self.bucket_size
         item = self.buckets[bucket_index]
         while item:
@@ -103,28 +101,28 @@ class HashTable:
         assert type(key) == str
         #------------------------#
         # Write your code here!  #
-        # check whether rehash is needed or not
-        if self.check_size_rehash_half:
-            self.rehash_half
-        # find the key
+        if self.check_size_rehash_half():
+            # it is better to rehash
+            self.rehash_half()
+        
         bucket_index = calculate_hash(key) % self.bucket_size
-        if self.buckets[bucket_index]: # in case the bucket is empty
-            item = self.buckets[bucket_index] 
-            item_next = item.next
-            # when the first item == key
-            if item.key == key:
-                self.buckets[bucket_index] = item.next
+        # when the bucket is empty
+        if self.buckets[bucket_index] is None: return False
+        # when the bucket is not empty
+        item = self.buckets[bucket_index]
+        item_next = item.next
+        if item.key == key:
+            self.buckets[bucket_index] = item.next
+            self.item_count -= 1
+            return True
+        while item_next:
+            if item_next.key == key:
+                item.next = item_next.next
                 self.item_count -= 1
                 return True
-            # when the first item != key
-            while item_next:
-                if item_next.key == key:
-                    item.next = item_next.next # skip item_next
-                    self.item_count -= 1 
-                    return True
-                item = item.next # check the next item
-                item_next = item_next.next
-        return False # cannot find the key
+            item = item.next
+            item_next = item_next.next
+        return False
         #------------------------#
 
     # Return the total number of items in the hash table.
@@ -139,42 +137,37 @@ class HashTable:
     def check_size(self):
         assert (self.bucket_size < 100 or
                 self.item_count >= self.bucket_size * 0.3)
-    #------------------------#
-    # if too much space is used -> double
+
     def check_size_rehash_double(self):
-        assert (self.item_count > self.bucket_size * 0.7)
-    # if too less space is used -> half
+        return self.item_count > self.bucket_size * 0.7 
+
     def check_size_rehash_half(self):
-        assert (self.item_count < self.bucket_size * 0.3)
-    
+        return self.item_count < self.bucket_size * 0.3
+        
     def rehash_double(self):
-        # prepare a new hashtable
-        new_self = HashTable()
-        new_self.bucket_size = self.bucket_size * 2 # double the size 
-        new_self.buckets = [None] * self.bucket_size
-        new_self.item_count = 0
-        # put all items in the new hashtable
-        for i in range(self.bucket_size):
-            if self.buckets[i]: # in case the bucket is empty
-                item = self.buckets[i]
+        buckets_origin = self.buckets
+        self.bucket_size = self.bucket_size * 2 + 1 # odd number is preferred in terms of conflicts
+        self.buckets = [None] * self.bucket_size
+        self.item_count = 0
+        for i in range(len(buckets_origin)):
+            if buckets_origin[i]:
+                item = buckets_origin[i]
                 while item:
-                    new_self.put(item.key, item.value)
-        return new_self
-    
+                    self.put(item.key, item.value)
+                    item = item.next
+        
     def rehash_half(self):
-        # prepare a new hashtable
-        new_self = HashTable()
-        new_self.bucket_size = self.bucket_size // 2 # make the size half
-        new_self.buckets = [None] * self.bucket_size
-        new_self.item_count = 0
-        # put all items in the new hashtable
-        for i in range(self.bucket_size):
-            if self.buckets[i]: # in case the bucket is empty
-                item = self.buckets[i]
+        buckets_origin = self.buckets
+        self.bucket_size = self.bucket_size // 2
+        self.buckets = [None] * self.bucket_size 
+        self.item_count = 0
+        for i in range(len(buckets_origin)):
+            if buckets_origin[i]:
+                item = buckets_origin[i]
                 while item:
-                    new_self.put(item.key, item.value)
-        return new_self
-    #------------------------#
+                    self.put(item.key, item.value)
+                    item = item.next
+
 
 
 
