@@ -7,15 +7,28 @@ import hash_table
 # Note: Please do not use a library like collections.OrderedDict). The goal is
 #       to implement the data structure yourself!
 
+# An item object that represents one key - value pair in the hash table.
+class Item_for_doubly_linked_list:
+    # |key|: The key of the item. The key must be a string.
+    # |value|: The value of the item.
+    # |next|: The next item in the linked list. If this is the last item in the
+    #         linked list, |next| is None.
+    def __init__(self, url = "", contents = "", prev = None, next = None):
+        assert type(url) == str
+        self.url = url
+        self.contents = contents
+        self.prev = prev
+        self.next = next
+
 class Cache:
     # Initialize the cache.
     # |n|: The size of the cache.
     def __init__(self, n):
         #------------------------#
         self.size = n
-        self.hash = hash_table.HashTable(2 * n)
-        # make a queue to record the history
-        self.history = [] 
+        self.hash = hash_table.HashTable(2 * n) # key: url, value: Item_for_doubly_linked_list()
+        self.history_oldest = Item_for_doubly_linked_list()
+        self.history_newest = Item_for_doubly_linked_list()
         #------------------------#
         pass
 
@@ -26,56 +39,57 @@ class Cache:
     def access_page(self, url, contents):
         #------------------------#
         assert(type(url) == str)
-        bucket_index = hash_table.calculate_hash(url) % self.hash.bucket_size
-        page = self.hash.buckets[bucket_index]
-        # if page is in the cache, no change in hashtable
-        while page:
-            if page.key == url:
-                # put url into the history
-                self.history.append(url)
-                # access the page
-                return contents
-            page = page.next
-        # page is not in the cache
-        ## if there is space, just insert the new url
-        if self.hash.item_count < self.size :
-            self.history.append(url)
-            page_new = hash_table.Item(url, contents, self.hash.buckets[bucket_index])
-            self.hash.item_count += 1
-            self.hash.buckets[bucket_index] = page_new
-            return contents
-
-        # else: if there is no space, delete the oldest url and insert the new url
-        ## find the oldest one
-        ## get the latest index of pages in hashtable
-        hashtable_index_in_reversed_history = []
-        reversed_history = list(reversed(self.history))
-        # search for all pages in hashtable
-        for bucket_index in range(len(self.hash.buckets)):
-            if self.hash.buckets[bucket_index]:
-                page = self.hash.buckets[bucket_index]
-                while page: 
-                    # find the page in the reversed_history from scratch
-                    i = 0
-                    while i >= 0 and i < len(self.history):
-                        if reversed_history[i] == page.key:
-                            hashtable_index_in_reversed_history.append(i)
-                            # quit if the latest(smallest) index is found
-                            i = -1 
-                        else: i += 1
-                    page = page.next
-        hashtable_index_in_reversed_history.sort()
-
-        ## delete the oldest one
-        self.hash.delete(reversed_history[hashtable_index_in_reversed_history[self.size - 1]]) 
-
-        ## insert the new page
-        bucket_index = hash_table.calculate_hash(url) % self.hash.bucket_size
-        page_new = hash_table.Item(url, contents, self.hash.buckets[bucket_index])
-        self.hash.buckets[bucket_index] = page_new
-        self.hash.item_count += 1
-        ## update the history
-        self.history.append(url)
+        access_item = self.hash.get(url)[0]
+        if access_item is not None:
+            # page is in the cache -> no change in hashtable
+            # update the history 
+            ## delete the old item
+            if access_item.prev.prev is None:
+                # access_item is the oldest one in the history
+                access_item.next.prev = self.history_oldest
+                self.history_oldest.next = access_item.next
+            elif access_item.next.next is None:
+                # access_item is the newest one in the history
+                access_item.prev.next = self.history_newest
+                self.history_newest.prev = access_item.prev
+            else:
+                # access_item is at the middle in the history
+                access_item.prev.next = access_item.next
+                access_item.next.prev = access_item.prev
+            ## put the item at the newest
+            access_item.prev = self.history_newest.prev
+            self.history_newest.prev.next = access_item
+            self.history_newest.prev = access_item
+            access_item.next = self.history_newest
+        elif self.hash.item_count < self.size:
+            # page is not in the cache, but there is enough space to put new page
+            ## update the history
+            new_item = Item_for_doubly_linked_list(url, contents, self.history_newest.prev, self.history_newest)
+            if self.history_newest.prev is not None:
+                # history is not empty
+                self.history_newest.prev.next = new_item
+                self.history_newest.prev = new_item
+            else:
+                # history is empty
+                new_item.prev = self.history_oldest
+                self.history_newest.prev = new_item
+                self.history_oldest.next = new_item
+            ## put the item into the hash
+            self.hash.put(url, new_item)
+        else: 
+            # page is not in the cache, and there no space to put new page
+            ## update the history
+            ## delete the oldest one from the hashtable
+            self.hash.delete(self.history_oldest.next.url)
+            ## delete the oldest one from the history
+            self.history_oldest.next.next.prev = self.history_oldest
+            self.history_oldest.next = self.history_oldest.next.next
+            ## put the item at the newest
+            new_item = Item_for_doubly_linked_list(url, contents, self.history_newest.prev, self.history_newest)
+            self.history_newest.prev.next = new_item
+            self.history_newest.prev = new_item
+            ## put the item into the hash
+            self.hash.put(url, new_item)
         return contents
         #------------------------#
 
@@ -83,26 +97,16 @@ class Cache:
     # in which the URLs are mostly recently accessed.
     def get_pages(self):
         #------------------------#
-        ans_index_in_reversed_history = []
-        reversed_history = list(reversed(self.history)) # list() is needed here!!
-        ## get the latest index of all pages in hashtable
-        for bucket_index in range(len(self.hash.buckets)):
-            if self.hash.buckets[bucket_index]:
-                page = self.hash.buckets[bucket_index]
-                i = 0
-                while i >= 0 and i < len(self.history):
-                    if reversed_history[i] == page.key:
-                        ans_index_in_reversed_history.append(i)
-                        ## quit if the smallest index is found
-                        i = -1
-                    else: i += 1
-        # most recently accessed URL has the smallest index
-        ans_index_in_reversed_history.sort()
         ans = []
-        for index in ans_index_in_reversed_history:
-            ans.append(reversed_history[index])
+        if self.history_newest.prev is None: 
+            # history is not empty
+            return ans
+        # history is not empty
+        item_in_history = self.history_newest.prev
+        while item_in_history.prev is not None:
+            ans.append(item_in_history.url)
+            item_in_history = item_in_history.prev
         return ans
-
         #------------------------#
         
 
