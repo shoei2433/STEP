@@ -87,6 +87,12 @@ def tokenize(line):
         tokens.append(token)
     return tokens
 
+###################################################################
+# factor = number or (expression) or abs(expression) or ...
+# term = factor * factor or factor / factor or ...
+# expression = term + term or term - term or ...
+###################################################################
+
 # detect factor: number or () or abs()
 def detect_factor(tokens, index):
     if tokens[index]['type'] == "NUMBER":
